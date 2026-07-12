@@ -7,19 +7,20 @@ from google import genai
 from google.genai import types
 
 app = Flask(__name__)
-# Enable CORS for requests coming from Cloudflare Workers
 CORS(app, resources={r"/*": {"origins": "*"} })
 
-# Initialize the Gemini Client using the new google-genai SDK
-# Ensure the GEMINI_API_KEY environment variable is set in your Render dashboard
 client = genai.Client()
 
 def clean_answer(text: str) -> str:
     cleaned = text.strip()
-    # Remove markdown code blocks if the model accidentally wraps the answer
     cleaned = re.sub(r'^```[a-zA-Z]*\s*', '', cleaned)
     cleaned = re.sub(r'\s*```$', '', cleaned).strip()
     return cleaned
+
+# Add a root route to handle default GET/HEAD requests and prevent 404 errors
+@app.route('/', methods=['GET', 'HEAD'])
+def index():
+    return jsonify({"status": "healthy", "message": "Multimodal QA API is running"}), 200
 
 @app.route('/answer-image', methods=['POST'])
 def answer_image():
@@ -34,7 +35,6 @@ def answer_image():
         if not image_base64 or not question:
             return jsonify({"error": "Missing image_base64 or question in request"}), 400
             
-        # Standardize the base64 string by removing data URI headers if present
         if "," in image_base64:
             image_base64 = image_base64.split(",", 1)[1]
             
@@ -43,7 +43,6 @@ def answer_image():
         except Exception:
             return jsonify({"error": "Invalid base64 encoding"}), 400
 
-        # Construct a strict system instruction to enforce the formatting rules
         system_instruction = (
             "You are a precise document data extraction agent. Analyze the provided image and "
             "answer the user query directly. "
@@ -64,7 +63,7 @@ def answer_image():
             ],
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
-                temperature=0.0 # Lowest temperature for deterministic, literal extraction
+                temperature=0.0
             )
         )
         
@@ -74,7 +73,6 @@ def answer_image():
         return jsonify({"answer": final_answer}), 200
 
     except Exception as e:
-        # Prevent HTTP 500 errors by catching anomalies and returning descriptive errors
         return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
