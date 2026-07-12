@@ -7,7 +7,6 @@ from google import genai
 from google.genai import types
 
 app = Flask(__name__)
-# Enable CORS globally for all endpoints to allow cross-origin requests from the grader
 CORS(app, resources={r"/*": {"origins": "*"} })
 
 # Initialize the Gemini Client. 
@@ -16,7 +15,6 @@ client = genai.Client()
 
 def clean_answer(text: str) -> str:
     cleaned = text.strip()
-    # Remove markdown code blocks if the model wraps the output text
     cleaned = re.sub(r'^```[a-zA-Z]*\s*', '', cleaned)
     cleaned = re.sub(r'\s*```$', '', cleaned).strip()
     return cleaned
@@ -38,14 +36,11 @@ def answer_image():
         if not image_base64 or not question:
             return jsonify({"error": "Missing image_base64 or question in request"}), 400
             
-        # Clean up data URI scheme prefix if present
         if "," in image_base64:
             image_base64 = image_base64.split(",", 1)[1]
             
-        # Strip structural whitespace/newlines that might corrupt padding calculation
         image_base64 = image_base64.replace(" ", "").replace("\n", "").replace("\r", "")
 
-        # Fix missing base64 padding to prevent binascii.Error decoding crashes
         missing_padding = len(image_base64) % 4
         if missing_padding:
             image_base64 += '=' * (4 - missing_padding)
@@ -64,9 +59,9 @@ def answer_image():
             "3. If the answer is a number, output only the digits and necessary decimal points (e.g., '4089.35')."
         )
 
-        # Using gemini-2.5-flash as the primary multimodal execution model
+        # Switched to the universally accessible gemini-1.5-flash model
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-1.5-flash',
             contents=[
                 types.Part.from_bytes(
                     data=image_bytes,
@@ -86,7 +81,6 @@ def answer_image():
         return jsonify({"answer": final_answer}), 200
 
     except Exception as e:
-        # Returns the explicit exception context inside the JSON payload for easier debugging
         return jsonify({"error": f"Internal execution failed: {str(e)}"}), 400
 
 if __name__ == '__main__':
